@@ -194,6 +194,18 @@ ROBOTS: dict[common.RobotType, RobotMetaConfig] = {
         ),
         attachment_site="tcp_site",
     ),
+    common.RobotType("ElRobot"): RobotMetaConfig(
+        mjcf_model_path="assets/robots/elrobot/elrobot.xml",
+        dof=7,
+        # joint 6 is bent because the wrist rolls (joints 5 and 7) are collinear at q6 = 0
+        q_home=np.array([0.0, -0.2, -0.05, -0.2, 0.0, 0.95, 0.0]),
+        joint_limits=np.array(
+            [
+                [-1.5509, -1.6122, -1.761, -1.7533, -2.62, -1.3775, -3.2014],
+                [1.5509, 1.6122, 1.761, 1.7533, 3.252, 1.7641, 2.7336],
+            ]
+        ),
+    ),
 }
 
 

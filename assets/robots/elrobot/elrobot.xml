@@ -1,0 +1,372 @@
+<!-- ElRobot follower arm with its parallel gripper and wrist camera.
+
+     Derived from NormaCore's ElRobot simulation model and STL files
+     (https://github.com/norma-core/norma-core, hardware/elrobot, Apache-2.0).
+     Changes to the upstream URDF and meshes:
+       - converted to MJCF; meshes split into one file per part in its own link frame,
+         decimated, and the ST3215 servo instanced from a single mesh
+       - collision geometry from a convex decomposition instead of the full visual meshes
+       - inertias recomputed (the upstream gripper gear has a zero inertia tensor and
+         does not load in MuJoCo), servos weighed at 60 g each
+       - joint axes snapped to the exact principal axes (0.5-1.4 deg CAD export tilt);
+         link origins and the q = 0 pose are unchanged
+       - base frame rotated -90 deg about z: x forward, y left, z up, arm along +x at q = 0
+       - jaw coupling reversed so that rev_motor_08 = 0 is closed and 2.2028 is open
+       - added the wrist camera: the BOM's arm camera (Innomaker U20CAM-1080P) on
+         NormaCore's 27 mm gripper camera mount; the camera body is drawn as a box and a
+         cylinder, its intrinsics are nominal (centred principal point)
+       - added position actuators with ST3215 gains and the attachment_site at the TCP
+
+     Joint names are NormaCore's, where NN in rev_motor_NN is the ST3215 servo id:
+       rev_motor_01..07  shoulder pan, shoulder lift, elbow flex, forearm flex,
+                         forearm roll, wrist flex, wrist roll
+       rev_motor_08      gripper; the jaws rev_motor_08_1/_2 follow it through equality
+                         constraints
+     attachment_site sits between the jaw tips, z along the approach direction. -->
+<mujoco model="elrobot">
+  <compiler angle="radian" meshdir="assets" autolimits="true" />
+  <option integrator="implicitfast" />
+  <visual>
+    <global offwidth="1920" offheight="1080" />
+  </visual>
+  <default>
+    <default class="elrobot">
+      <geom solref="0.004 1" friction="1 0.05 0.01" />
+      <default class="visual">
+        <geom type="mesh" contype="0" conaffinity="0" group="2" />
+      </default>
+      <default class="collision">
+        <geom type="mesh" group="3" rgba="0.8 0.3 0.3 0.4" />
+      </default>
+    </default>
+    <default class="sts3215">
+      <joint damping="0.6" frictionloss="0.052" armature="0.028" />
+      <position kp="17.8" kv="0.5" forcerange="-3.35 3.35" />
+    </default>
+    <default class="jaw">
+      <joint damping="5" armature="0.001" />
+    </default>
+  </default>
+  <asset>
+    <material name="elrobot_primary" rgba="0.168627 0.168627 0.188235 1.000" specular="0.3" shininess="0.3" />
+    <material name="elrobot_accent" rgba="0.223529 0.411765 0.619608 1.000" specular="0.3" shininess="0.3" />
+    <material name="elrobot_motor" rgba="0.078431 0.078431 0.086275 1.000" specular="0.3" shininess="0.3" />
+    <material name="elrobot_camera" rgba="0.227451 0.227451 0.243137 1.000" specular="0.3" shininess="0.3" />
+    <mesh name="base" file="visual/base.stl" />
+    <mesh name="base_shield" file="visual/base_shield.stl" />
+    <mesh name="sts3215" file="visual/sts3215.stl" />
+    <mesh name="base_link_0" file="collision/base_link_0.stl" />
+    <mesh name="base_link_1" file="collision/base_link_1.stl" />
+    <mesh name="base_link_2" file="collision/base_link_2.stl" />
+    <mesh name="base_link_3" file="collision/base_link_3.stl" />
+    <mesh name="base_link_4" file="collision/base_link_4.stl" />
+    <mesh name="base_link_5" file="collision/base_link_5.stl" />
+    <mesh name="base_link_6" file="collision/base_link_6.stl" />
+    <mesh name="base_link_7" file="collision/base_link_7.stl" />
+    <mesh name="joint_01_1_body" file="visual/joint_01_1_body.stl" />
+    <mesh name="shoulder_link_0" file="collision/shoulder_link_0.stl" />
+    <mesh name="shoulder_link_1" file="collision/shoulder_link_1.stl" />
+    <mesh name="shoulder_link_2" file="collision/shoulder_link_2.stl" />
+    <mesh name="shoulder_link_3" file="collision/shoulder_link_3.stl" />
+    <mesh name="shoulder_link_4" file="collision/shoulder_link_4.stl" />
+    <mesh name="shoulder_link_5" file="collision/shoulder_link_5.stl" />
+    <mesh name="shoulder_link_6" file="collision/shoulder_link_6.stl" />
+    <mesh name="shoulder_link_7" file="collision/shoulder_link_7.stl" />
+    <mesh name="joint_2" file="visual/joint_2.stl" />
+    <mesh name="joint_2_shield" file="visual/joint_2_shield.stl" />
+    <mesh name="upper_arm_link_0" file="collision/upper_arm_link_0.stl" />
+    <mesh name="upper_arm_link_1" file="collision/upper_arm_link_1.stl" />
+    <mesh name="upper_arm_link_2" file="collision/upper_arm_link_2.stl" />
+    <mesh name="upper_arm_link_3" file="collision/upper_arm_link_3.stl" />
+    <mesh name="upper_arm_link_4" file="collision/upper_arm_link_4.stl" />
+    <mesh name="upper_arm_link_5" file="collision/upper_arm_link_5.stl" />
+    <mesh name="upper_arm_link_6" file="collision/upper_arm_link_6.stl" />
+    <mesh name="upper_arm_link_7" file="collision/upper_arm_link_7.stl" />
+    <mesh name="joint_3" file="visual/joint_3.stl" />
+    <mesh name="joint_3_shield_drive_side" file="visual/joint_3_shield_drive_side.stl" />
+    <mesh name="joint_3_shield_camera_side" file="visual/joint_3_shield_camera_side.stl" />
+    <mesh name="elbow_link_0" file="collision/elbow_link_0.stl" />
+    <mesh name="elbow_link_1" file="collision/elbow_link_1.stl" />
+    <mesh name="elbow_link_2" file="collision/elbow_link_2.stl" />
+    <mesh name="elbow_link_3" file="collision/elbow_link_3.stl" />
+    <mesh name="elbow_link_4" file="collision/elbow_link_4.stl" />
+    <mesh name="elbow_link_5" file="collision/elbow_link_5.stl" />
+    <mesh name="elbow_link_6" file="collision/elbow_link_6.stl" />
+    <mesh name="elbow_link_7" file="collision/elbow_link_7.stl" />
+    <mesh name="joint_04_v1_1_body" file="visual/joint_04_v1_1_body.stl" />
+    <mesh name="joint_4_shield" file="visual/joint_4_shield.stl" />
+    <mesh name="forearm_link_0" file="collision/forearm_link_0.stl" />
+    <mesh name="forearm_link_1" file="collision/forearm_link_1.stl" />
+    <mesh name="forearm_link_2" file="collision/forearm_link_2.stl" />
+    <mesh name="forearm_link_3" file="collision/forearm_link_3.stl" />
+    <mesh name="forearm_link_4" file="collision/forearm_link_4.stl" />
+    <mesh name="forearm_link_5" file="collision/forearm_link_5.stl" />
+    <mesh name="forearm_link_6" file="collision/forearm_link_6.stl" />
+    <mesh name="forearm_link_7" file="collision/forearm_link_7.stl" />
+    <mesh name="joint_05_v1_1_body" file="visual/joint_05_v1_1_body.stl" />
+    <mesh name="forearm_roll_link_0" file="collision/forearm_roll_link_0.stl" />
+    <mesh name="forearm_roll_link_1" file="collision/forearm_roll_link_1.stl" />
+    <mesh name="forearm_roll_link_2" file="collision/forearm_roll_link_2.stl" />
+    <mesh name="forearm_roll_link_3" file="collision/forearm_roll_link_3.stl" />
+    <mesh name="forearm_roll_link_4" file="collision/forearm_roll_link_4.stl" />
+    <mesh name="forearm_roll_link_5" file="collision/forearm_roll_link_5.stl" />
+    <mesh name="forearm_roll_link_6" file="collision/forearm_roll_link_6.stl" />
+    <mesh name="forearm_roll_link_7" file="collision/forearm_roll_link_7.stl" />
+    <mesh name="joint_6" file="visual/joint_6.stl" />
+    <mesh name="joint_6_shield" file="visual/joint_6_shield.stl" />
+    <mesh name="wrist_link_0" file="collision/wrist_link_0.stl" />
+    <mesh name="wrist_link_1" file="collision/wrist_link_1.stl" />
+    <mesh name="wrist_link_2" file="collision/wrist_link_2.stl" />
+    <mesh name="wrist_link_3" file="collision/wrist_link_3.stl" />
+    <mesh name="wrist_link_4" file="collision/wrist_link_4.stl" />
+    <mesh name="wrist_link_5" file="collision/wrist_link_5.stl" />
+    <mesh name="wrist_link_6" file="collision/wrist_link_6.stl" />
+    <mesh name="wrist_link_7" file="collision/wrist_link_7.stl" />
+    <mesh name="gripper_base" file="visual/gripper_base.stl" />
+    <mesh name="gripper_base_shield" file="visual/gripper_base_shield.stl" />
+    <mesh name="camera_mount" file="visual/camera_mount.stl" />
+    <mesh name="gripper_base_link_0" file="collision/gripper_base_link_0.stl" />
+    <mesh name="gripper_base_link_1" file="collision/gripper_base_link_1.stl" />
+    <mesh name="gripper_base_link_2" file="collision/gripper_base_link_2.stl" />
+    <mesh name="gripper_base_link_3" file="collision/gripper_base_link_3.stl" />
+    <mesh name="gripper_base_link_4" file="collision/gripper_base_link_4.stl" />
+    <mesh name="gripper_base_link_5" file="collision/gripper_base_link_5.stl" />
+    <mesh name="gripper_base_link_6" file="collision/gripper_base_link_6.stl" />
+    <mesh name="gripper_base_link_7" file="collision/gripper_base_link_7.stl" />
+    <mesh name="gripper_gear" file="visual/gripper_gear.stl" />
+    <mesh name="gripper_gear_link_0" file="collision/gripper_gear_link_0.stl" />
+    <mesh name="gripper_gear_link_1" file="collision/gripper_gear_link_1.stl" />
+    <mesh name="gripper_gear_link_2" file="collision/gripper_gear_link_2.stl" />
+    <mesh name="gripper_gear_link_3" file="collision/gripper_gear_link_3.stl" />
+    <mesh name="gripper_gear_link_4" file="collision/gripper_gear_link_4.stl" />
+    <mesh name="gripper_gear_link_5" file="collision/gripper_gear_link_5.stl" />
+    <mesh name="gripper_gear_link_6" file="collision/gripper_gear_link_6.stl" />
+    <mesh name="gripper_gear_link_7" file="collision/gripper_gear_link_7.stl" />
+    <mesh name="gripper_jaw" file="visual/gripper_jaw.stl" />
+    <mesh name="jaw_right_link_0" file="collision/jaw_right_link_0.stl" />
+    <mesh name="jaw_right_link_1" file="collision/jaw_right_link_1.stl" />
+    <mesh name="jaw_right_link_2" file="collision/jaw_right_link_2.stl" />
+    <mesh name="jaw_right_link_3" file="collision/jaw_right_link_3.stl" />
+    <mesh name="jaw_right_link_4" file="collision/jaw_right_link_4.stl" />
+    <mesh name="jaw_right_link_5" file="collision/jaw_right_link_5.stl" />
+    <mesh name="jaw_right_link_6" file="collision/jaw_right_link_6.stl" />
+    <mesh name="jaw_right_link_7" file="collision/jaw_right_link_7.stl" />
+    <mesh name="jaw_left_link_0" file="collision/jaw_left_link_0.stl" />
+    <mesh name="jaw_left_link_1" file="collision/jaw_left_link_1.stl" />
+    <mesh name="jaw_left_link_2" file="collision/jaw_left_link_2.stl" />
+    <mesh name="jaw_left_link_3" file="collision/jaw_left_link_3.stl" />
+    <mesh name="jaw_left_link_4" file="collision/jaw_left_link_4.stl" />
+    <mesh name="jaw_left_link_5" file="collision/jaw_left_link_5.stl" />
+    <mesh name="jaw_left_link_6" file="collision/jaw_left_link_6.stl" />
+    <mesh name="jaw_left_link_7" file="collision/jaw_left_link_7.stl" />
+    <mesh name="sts3215_col" file="collision/sts3215.stl" />
+  </asset>
+  <worldbody>
+    <body name="base_link" pos="0 0 0" childclass="elrobot">
+      <inertial pos="0.0211276131 -4.54436593e-06 0.0243719139" mass="0.128317757" fullinertia="7.14589783e-05 6.51069789e-05 7.32476237e-05 -2.02226133e-09 2.13365971e-06 -2.67389065e-09" />
+      <geom class="visual" mesh="base" material="elrobot_primary" pos="0.0265935001 -0.0500073998 0.028489048" quat="0.707172898 -0.707040649 -0.00010762204 3.25838442e-05" />
+      <geom class="visual" mesh="base_shield" material="elrobot_accent" pos="0.0102816432 -3.50352457e-06 0.0524684099" quat="0.999999703 -0.000345542369 -0.000269089712 0.000634817522" />
+      <geom class="visual" mesh="sts3215" material="elrobot_motor" pos="0.0298415223 4.79780795e-05 0.0296523035" quat="-0.707106781 -8.47625355e-17 -3.16741599e-17 0.707106781" />
+      <geom class="collision" mesh="base_link_0" />
+      <geom class="collision" mesh="base_link_1" />
+      <geom class="collision" mesh="base_link_2" />
+      <geom class="collision" mesh="base_link_3" />
+      <geom class="collision" mesh="base_link_4" />
+      <geom class="collision" mesh="base_link_5" />
+      <geom class="collision" mesh="base_link_6" />
+      <geom class="collision" mesh="base_link_7" />
+      <geom class="collision" mesh="sts3215_col" pos="0.0298415223 4.79780795e-05 0.0296523035" quat="-0.707106781 -8.47625355e-17 -3.16741599e-17 0.707106781" />
+      <body name="shoulder_link" pos="0.042489 9.43445322e-18 0.049005">
+        <inertial pos="0.00379191215 0.000558745433 0.0172794727" mass="0.0960334754" fullinertia="5.96820454e-05 5.89025212e-05 2.14953648e-05 2.17008571e-07 1.1836164e-05 -5.41162562e-07" />
+        <joint name="rev_motor_01" type="hinge" axis="0 0 1" range="-1.5509 1.5509" class="sts3215" />
+        <geom class="visual" mesh="joint_01_1_body" material="elrobot_primary" pos="0 0 0" quat="1 0 0 0" />
+        <geom class="visual" mesh="sts3215" material="elrobot_motor" pos="-0.000300617875 0.00122273968 0.0289554505" quat="0.707100489 0.707101271 -0.00289718825 0.00288038765" />
+        <geom class="collision" mesh="shoulder_link_0" />
+        <geom class="collision" mesh="shoulder_link_1" />
+        <geom class="collision" mesh="shoulder_link_2" />
+        <geom class="collision" mesh="shoulder_link_3" />
+        <geom class="collision" mesh="shoulder_link_4" />
+        <geom class="collision" mesh="shoulder_link_5" />
+        <geom class="collision" mesh="shoulder_link_6" />
+        <geom class="collision" mesh="shoulder_link_7" />
+        <geom class="collision" mesh="sts3215_col" pos="-0.000300617875 0.00122273968 0.0289554505" quat="0.707100489 0.707101271 -0.00289718825 0.00288038765" />
+        <body name="upper_arm_link" pos="-0.000366 0.019668 0.041933">
+          <inertial pos="-0.000557718202 -0.0191537106 0.0633136714" mass="0.102026521" fullinertia="8.16616603e-05 6.85185901e-05 2.5496385e-05 6.51358242e-09 4.75810781e-07 -1.56046061e-06" />
+          <joint name="rev_motor_02" type="hinge" axis="-2.22044605e-16 1 0" range="-1.6122 1.6122" class="sts3215" />
+          <geom class="visual" mesh="joint_2" material="elrobot_primary" pos="0.0148633113 -0.0203932092 0.0434674522" quat="-0.703992319 -0.00278868002 0.710193668 0.0034629518" />
+          <geom class="visual" mesh="joint_2_shield" material="elrobot_accent" pos="0.0149081458 -0.0412840663 0.0350776011" quat="-0.704222096 -0.00129189556 0.709957896 0.00541821547" />
+          <geom class="visual" mesh="joint_2_shield" material="elrobot_accent" pos="-0.0155786403 0.000647392531 0.0352621472" quat="-0.00119290723 0.703691248 -0.00442037767 0.710491143" />
+          <geom class="visual" mesh="sts3215" material="elrobot_motor" pos="-0.000729287071 -0.018209105 0.0780984993" quat="0.704038254 0.710150002 -0.00292298304 0.00292712055" />
+          <geom class="collision" mesh="upper_arm_link_0" />
+          <geom class="collision" mesh="upper_arm_link_1" />
+          <geom class="collision" mesh="upper_arm_link_2" />
+          <geom class="collision" mesh="upper_arm_link_3" />
+          <geom class="collision" mesh="upper_arm_link_4" />
+          <geom class="collision" mesh="upper_arm_link_5" />
+          <geom class="collision" mesh="upper_arm_link_6" />
+          <geom class="collision" mesh="upper_arm_link_7" />
+          <geom class="collision" mesh="sts3215_col" pos="-0.000729287071 -0.018209105 0.0780984993" quat="0.704038254 0.710150002 -0.00292298304 0.00292712055" />
+          <body name="elbow_link" pos="-0.000796 0.000122 0.091235">
+            <inertial pos="0.0164118728 -0.0202988383 0.0339233258" mass="0.0959277964" fullinertia="2.68889226e-05 3.44913549e-05 4.09864785e-05 -8.63736585e-07 -4.52257457e-06 -2.90150447e-07" />
+            <joint name="rev_motor_03" type="hinge" axis="-2.22044605e-16 1 0" range="-1.761 1.761" class="sts3215" />
+            <geom class="visual" mesh="joint_3" material="elrobot_primary" pos="-0.0154444624 -0.0201434106 0.0235177636" quat="-0.0060619652 0.703929216 -0.0064092582 0.710215342" />
+            <geom class="visual" mesh="joint_3_shield_drive_side" material="elrobot_accent" pos="-0.0154756508 0.00484303886 0.0239565618" quat="-0.00626714904 0.704016963 -0.00562950467 0.71013319" />
+            <geom class="visual" mesh="joint_3_shield_camera_side" material="elrobot_accent" pos="0.0203010893 -0.0435296428 0.023440823" quat="-0.703874845 -0.00745513267 0.710256931 0.0063020751" />
+            <geom class="visual" mesh="sts3215" material="elrobot_motor" pos="0.0241869488 -0.0194161267 0.036677721" quat="0.497800547 0.506314784 0.502198353 -0.493595754" />
+            <geom class="collision" mesh="elbow_link_0" />
+            <geom class="collision" mesh="elbow_link_1" />
+            <geom class="collision" mesh="elbow_link_2" />
+            <geom class="collision" mesh="elbow_link_3" />
+            <geom class="collision" mesh="elbow_link_4" />
+            <geom class="collision" mesh="elbow_link_5" />
+            <geom class="collision" mesh="elbow_link_6" />
+            <geom class="collision" mesh="elbow_link_7" />
+            <geom class="collision" mesh="sts3215_col" pos="0.0241869488 -0.0194161267 0.036677721" quat="0.497800547 0.506314784 0.502198353 -0.493595754" />
+            <body name="forearm_link" pos="0.037162 -0.000973 0.037065">
+              <inertial pos="0.0561965024 -0.0206096264 0.0069841196" mass="0.109105136" fullinertia="4.0732254e-05 6.26779582e-05 6.54460883e-05 3.21381546e-07 -6.10187099e-06 -3.70715158e-09" />
+              <joint name="rev_motor_04" type="hinge" axis="-2.22044605e-16 1 0" range="-1.7533 1.7533" class="sts3215" />
+              <geom class="visual" mesh="joint_04_v1_1_body" material="elrobot_primary" pos="0 0 0" quat="1 0 0 0" />
+              <geom class="visual" mesh="joint_4_shield" material="elrobot_accent" pos="0.0350408165 -0.0409005547 -0.0156591852" quat="0.999938639 0.00924281425 -0.0043626742 -0.00427265341" />
+              <geom class="visual" mesh="joint_4_shield" material="elrobot_accent" pos="0.0349991592 0.00031283839 0.0155547737" quat="-0.00860554708 0.999944275 -0.00437748556 0.00426948822" />
+              <geom class="visual" mesh="sts3215" material="elrobot_motor" pos="0.0636221293 -0.0207256872 0.01283518" quat="0.499945228 -0.495808384 0.5085232 -0.495613731" />
+              <geom class="collision" mesh="forearm_link_0" />
+              <geom class="collision" mesh="forearm_link_1" />
+              <geom class="collision" mesh="forearm_link_2" />
+              <geom class="collision" mesh="forearm_link_3" />
+              <geom class="collision" mesh="forearm_link_4" />
+              <geom class="collision" mesh="forearm_link_5" />
+              <geom class="collision" mesh="forearm_link_6" />
+              <geom class="collision" mesh="forearm_link_7" />
+              <geom class="collision" mesh="sts3215_col" pos="0.0636221293 -0.0207256872 0.01283518" quat="0.499945228 -0.495808384 0.5085232 -0.495613731" />
+              <body name="forearm_roll_link" pos="0.082863 -0.020714 1.6e-05">
+                <inertial pos="0.0271424534 0.00139090728 6.78197577e-05" mass="0.075034664" fullinertia="1.41531293e-05 1.85072392e-05 2.35072286e-05 1.75554925e-07 2.60568782e-08 -9.97545291e-08" />
+                <joint name="rev_motor_05" type="hinge" axis="-1 -2.22044605e-16 0" range="-2.62 3.252" class="sts3215" />
+                <geom class="visual" mesh="joint_05_v1_1_body" material="elrobot_primary" pos="0 0 0" quat="1 0 0 0" />
+                <geom class="visual" mesh="sts3215" material="elrobot_motor" pos="0.0297714124 0.00159130488 7.63732035e-05" quat="0.493530899 0.506379788 0.502174547 -0.497822745" />
+                <geom class="collision" mesh="forearm_roll_link_0" />
+                <geom class="collision" mesh="forearm_roll_link_1" />
+                <geom class="collision" mesh="forearm_roll_link_2" />
+                <geom class="collision" mesh="forearm_roll_link_3" />
+                <geom class="collision" mesh="forearm_roll_link_4" />
+                <geom class="collision" mesh="forearm_roll_link_5" />
+                <geom class="collision" mesh="forearm_roll_link_6" />
+                <geom class="collision" mesh="forearm_roll_link_7" />
+                <geom class="collision" mesh="sts3215_col" pos="0.0297714124 0.00159130488 7.63732035e-05" quat="0.493530899 0.506379788 0.502174547 -0.497822745" />
+                <body name="wrist_link" pos="0.042907 0.019923 0.00035">
+                  <inertial pos="0.0350489672 -0.0207361048 0.00754780723" mass="0.0961846539" fullinertia="3.09378747e-05 3.38296776e-05 2.95126375e-05 -8.27531097e-08 -1.24588405e-06 1.51674839e-07" />
+                  <joint name="rev_motor_06" type="hinge" axis="-2.22044605e-16 1 0" range="-1.3775 1.7641" class="sts3215" />
+                  <geom class="visual" mesh="joint_6" material="elrobot_primary" pos="0.0292630441 -0.0202372379 -0.0156228368" quat="0.00869090086 0.000258723379 -0.00880905922 0.999923398" />
+                  <geom class="visual" mesh="joint_6_shield" material="elrobot_accent" pos="0.0351729717 1.03481321e-05 0.0152399155" quat="-0.00854797523 0.999923836 -0.00889752289 0.000297447228" />
+                  <geom class="visual" mesh="joint_6_shield" material="elrobot_accent" pos="0.0329585639 -0.0412097848 -0.0160186602" quat="0.99991955 0.00745711765 -0.00148152757 -0.0101533166" />
+                  <geom class="visual" mesh="sts3215" material="elrobot_motor" pos="0.0361817841 -0.0207992601 0.0122772751" quat="0.495617469 -0.495782964 0.512883858 -0.495492407" />
+                  <geom class="collision" mesh="wrist_link_0" />
+                  <geom class="collision" mesh="wrist_link_1" />
+                  <geom class="collision" mesh="wrist_link_2" />
+                  <geom class="collision" mesh="wrist_link_3" />
+                  <geom class="collision" mesh="wrist_link_4" />
+                  <geom class="collision" mesh="wrist_link_5" />
+                  <geom class="collision" mesh="wrist_link_6" />
+                  <geom class="collision" mesh="wrist_link_7" />
+                  <geom class="collision" mesh="sts3215_col" pos="0.0361817841 -0.0207992601 0.0122772751" quat="0.495617469 -0.495782964 0.512883858 -0.495492407" />
+                  <body name="gripper_base_link" pos="0.055307 -0.020951 -0.000712">
+                    <inertial pos="0.0250176447 -0.000699916988 0.0121599334" mass="0.156558367" fullinertia="0.000185820953 0.000187477125 5.11953628e-05 -7.60908086e-07 2.22139836e-05 2.3130346e-06" />
+                    <joint name="rev_motor_07" type="hinge" axis="-1 -2.22044605e-16 0" range="-3.2014 2.7336" class="sts3215" />
+                    <geom class="visual" mesh="gripper_base" material="elrobot_primary" pos="0.0277886284 0.000169505364 -0.0355812525" quat="0.999919793 0.00901484016 0.00283979901 -0.0084305974" />
+                    <geom class="visual" mesh="gripper_base_shield" material="elrobot_accent" pos="0.0286130283 0.0230862952 -0.0151038454" quat="0.999926865 0.00890367217 0.00478194246 0.00664245142" />
+                    <geom class="visual" mesh="gripper_base_shield" material="elrobot_accent" pos="0.0223906901 -0.0233932831 -0.0158222511" quat="-0.00258486772 0.00657286384 -0.00808948062 0.999942336" />
+                    <geom class="visual" mesh="sts3215" material="elrobot_motor" pos="0.0258909445 -0.00026745747 -0.0130491411" quat="0.499948298 0.508544241 0.491464962 0.499896634" />
+                    <geom class="visual" mesh="camera_mount" material="elrobot_primary" pos="0 0 0" quat="1 0 0 0" />
+                    <geom class="visual" type="box" size="0.0160000008 0.0160000008 0.00079999998" pos="0.0104110999 -0.00136987178 0.0659967344" quat="0.376027037 0.605857219 0.588927363 0.380401443" material="elrobot_camera" />
+                    <geom class="visual" type="cylinder" size="0.0105962165 0.01315" pos="0.0230197117 -0.00147560932 0.0600289688" quat="0.376027037 0.605857219 0.588927363 0.380401443" material="elrobot_camera" />
+                    <geom class="collision" mesh="gripper_base_link_0" />
+                    <geom class="collision" mesh="gripper_base_link_1" />
+                    <geom class="collision" mesh="gripper_base_link_2" />
+                    <geom class="collision" mesh="gripper_base_link_3" />
+                    <geom class="collision" mesh="gripper_base_link_4" />
+                    <geom class="collision" mesh="gripper_base_link_5" />
+                    <geom class="collision" mesh="gripper_base_link_6" />
+                    <geom class="collision" mesh="gripper_base_link_7" />
+                    <geom class="collision" type="box" size="0.0160000008 0.0160000008 0.00079999998" pos="0.0104110999 -0.00136987178 0.0659967344" quat="0.376027037 0.605857219 0.588927363 0.380401443" />
+                    <geom class="collision" type="cylinder" size="0.0105962165 0.01315" pos="0.0230197117 -0.00147560932 0.0600289688" quat="0.376027037 0.605857219 0.588927363 0.380401443" />
+                    <geom class="collision" mesh="sts3215_col" pos="0.0258909445 -0.00026745747 -0.0130491411" quat="0.499948298 0.508544241 0.491464962 0.499896634" />
+                    <site name="attachment_site" pos="0.0971990297 -0.00168817024 0.00036011373" quat="-0.5 0.5 -0.5 0.5" size="0.005" group="3" />
+                    <camera name="wrist_camera" mode="fixed" pos="0.0341585903 -0.00156898629 0.0547568035" quat="-0.594941917 -0.376631377 0.379803103 0.599952102" resolution="1920 1080" sensorsize="0.001920 0.001080" focalpixel="1230.2570 1229.9495" principalpixel="0 0" />
+                    <body name="gripper_gear_link" pos="0.045242 -0.000776 -0.000409">
+                      <inertial pos="0.00389462097 -5.96030507e-05 -3.46368285e-05" mass="0.00219223396" fullinertia="1.94827881e-07 1.0318743e-07 1.03179832e-07 -1.23227549e-09 -8.3944434e-10 1.12656522e-11" />
+                      <joint name="rev_motor_08" type="hinge" axis="1 2.22044605e-16 0" range="0 2.2028" class="sts3215" />
+                      <geom class="visual" mesh="gripper_gear" material="elrobot_primary" pos="0.00374617201 0.000158349706 -0.01373527" quat="0.999935636 0.00790988774 0.00452684294 -0.00675754146" />
+                      <geom class="collision" mesh="gripper_gear_link_0" />
+                      <geom class="collision" mesh="gripper_gear_link_1" />
+                      <geom class="collision" mesh="gripper_gear_link_2" />
+                      <geom class="collision" mesh="gripper_gear_link_3" />
+                      <geom class="collision" mesh="gripper_gear_link_4" />
+                      <geom class="collision" mesh="gripper_gear_link_5" />
+                      <geom class="collision" mesh="gripper_gear_link_6" />
+                      <geom class="collision" mesh="gripper_gear_link_7" />
+                    </body>
+                    <body name="jaw_left_link" pos="0 0 0">
+                      <inertial pos="0.0629323894 0.0267831531 0.00245008645" mass="0.0122587712" fullinertia="4.06697274e-06 5.46981807e-06 3.1479868e-06 -9.7634879e-08 3.30187908e-07 3.76772778e-07" />
+                      <joint name="rev_motor_08_1" type="slide" axis="-2.22044605e-16 1 0" range="-0.0255 0" class="jaw" />
+                      <geom class="visual" mesh="gripper_jaw" material="elrobot_primary" pos="0.103536729 0.0128238594 -0.000286739549" quat="0.509200538 -0.497285756 -0.499277803 0.494108656" />
+                      <geom class="collision" mesh="jaw_left_link_0" />
+                      <geom class="collision" mesh="jaw_left_link_1" />
+                      <geom class="collision" mesh="jaw_left_link_2" />
+                      <geom class="collision" mesh="jaw_left_link_3" />
+                      <geom class="collision" mesh="jaw_left_link_4" />
+                      <geom class="collision" mesh="jaw_left_link_5" />
+                      <geom class="collision" mesh="jaw_left_link_6" />
+                      <geom class="collision" mesh="jaw_left_link_7" />
+                    </body>
+                    <body name="jaw_right_link" pos="0 0 0">
+                      <inertial pos="0.0619433136 -0.0289646739 -0.00112386421" mass="0.0122587712" fullinertia="4.06399988e-06 5.46108548e-06 3.15969226e-06 1.52470352e-07 -3.32944983e-07 3.86408273e-07" />
+                      <joint name="rev_motor_08_2" type="slide" axis="-2.22044605e-16 1 0" range="0 0.0255" class="jaw" />
+                      <geom class="visual" mesh="gripper_jaw" material="elrobot_primary" pos="0.10304472 -0.0164095499 0.000902888334" quat="-0.492878696 -0.496311114 0.498382227 0.512211895" />
+                      <geom class="collision" mesh="jaw_right_link_0" />
+                      <geom class="collision" mesh="jaw_right_link_1" />
+                      <geom class="collision" mesh="jaw_right_link_2" />
+                      <geom class="collision" mesh="jaw_right_link_3" />
+                      <geom class="collision" mesh="jaw_right_link_4" />
+                      <geom class="collision" mesh="jaw_right_link_5" />
+                      <geom class="collision" mesh="jaw_right_link_6" />
+                      <geom class="collision" mesh="jaw_right_link_7" />
+                    </body>
+                  </body>
+                </body>
+              </body>
+            </body>
+          </body>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+  <equality>
+    <joint joint1="rev_motor_08_1" joint2="rev_motor_08" polycoef="-0.025332 0.0115 0 0 0" solimp="0.95 0.99 0.001" />
+    <joint joint1="rev_motor_08_2" joint2="rev_motor_08" polycoef="0.025332 -0.0115 0 0 0" solimp="0.95 0.99 0.001" />
+  </equality>
+  <contact>
+    <exclude body1="base_link" body2="shoulder_link" />
+    <exclude body1="shoulder_link" body2="upper_arm_link" />
+    <exclude body1="upper_arm_link" body2="elbow_link" />
+    <exclude body1="elbow_link" body2="forearm_link" />
+    <exclude body1="forearm_link" body2="forearm_roll_link" />
+    <exclude body1="forearm_roll_link" body2="wrist_link" />
+    <exclude body1="wrist_link" body2="gripper_base_link" />
+    <exclude body1="gripper_base_link" body2="gripper_gear_link" />
+    <exclude body1="gripper_base_link" body2="jaw_left_link" />
+    <exclude body1="gripper_base_link" body2="jaw_right_link" />
+    <exclude body1="jaw_left_link" body2="jaw_right_link" />
+    <exclude body1="gripper_gear_link" body2="jaw_left_link" />
+    <exclude body1="gripper_gear_link" body2="jaw_right_link" />
+    <exclude body1="wrist_link" body2="gripper_gear_link" />
+  </contact>
+  <actuator>
+    <position class="sts3215" name="rev_motor_01" joint="rev_motor_01" ctrlrange="-1.5509 1.5509" />
+    <position class="sts3215" name="rev_motor_02" joint="rev_motor_02" ctrlrange="-1.6122 1.6122" />
+    <position class="sts3215" name="rev_motor_03" joint="rev_motor_03" ctrlrange="-1.761 1.761" />
+    <position class="sts3215" name="rev_motor_04" joint="rev_motor_04" ctrlrange="-1.7533 1.7533" />
+    <position class="sts3215" name="rev_motor_05" joint="rev_motor_05" ctrlrange="-2.62 3.252" />
+    <position class="sts3215" name="rev_motor_06" joint="rev_motor_06" ctrlrange="-1.3775 1.7641" />
+    <position class="sts3215" name="rev_motor_07" joint="rev_motor_07" ctrlrange="-3.2014 2.7336" />
+    <position class="sts3215" name="rev_motor_08" joint="rev_motor_08" ctrlrange="0 2.2028" />
+  </actuator>
+</mujoco>

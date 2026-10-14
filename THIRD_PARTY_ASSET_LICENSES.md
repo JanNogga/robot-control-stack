@@ -26,6 +26,9 @@ The following directories contain third-party assets:
 - `assets/cameras/d405/`
   Origin: Intel RealSense D405 camera assets distributed via MuJoCo Menagerie RealSense assets
   License: Apache License 2.0 notice reproduced below for the upstream Intel RealSense asset family
+- `assets/robots/elrobot/`
+  Origin: NormaCore `norma-core` `hardware/elrobot/` (simulation model and STL meshes) and `hardware/pgripper/` (27 mm gripper camera mount)
+  License: Apache License 2.0, with the NormaCore notice and the list of modifications reproduced below
 
 All other repository contents, including original RCS source code and RCS-authored assets, remain under AGPL-3.0 unless another file explicitly states otherwise.
 
@@ -260,6 +263,30 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ```
+
+## NormaCore ElRobot notice
+
+```text
+Copyright 2026 NormaCore
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+```
+
+The files in `assets/robots/elrobot/` were modified from the NormaCore originals: the URDF was converted to MJCF,
+the meshes were split per part, decimated and re-expressed in their link frames, convex collision meshes were added,
+the inertias were recomputed, the joint axes were snapped to the principal axes, the base frame was rotated, the jaw
+coupling was reversed, and a wrist camera, position actuators and an attachment site were added. The header of
+`assets/robots/elrobot/elrobot.xml` lists the changes in detail.
 
 ## Universal Robots UR5e
 
