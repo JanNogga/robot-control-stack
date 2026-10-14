@@ -625,6 +625,60 @@ class EmptyWorldYam(EmptyWorldFR3):
         return cfg
 
 
+class EmptyWorldElRobot(EmptyWorldFR3):
+    # The gripper is part of the elrobot mjcf, so its joint and actuator are prefixed with the robot.
+    gripper_prefix_template = EmptyWorldFR3.robot_prefix_template
+
+    def config(self) -> SimEnvCreatorConfig:
+        rt = RobotType("ElRobot")
+        cfg = super().config()
+        lead_robot_name = self.lead_robot_name(cfg)
+
+        robot_cfg = cfg.robot_cfgs[lead_robot_name]
+        robot_cfg.robot_type = rt
+        robot_cfg.tcp_offset = rcs.common.Pose()
+        robot_cfg.attachment_site = rcs.ROBOTS[rt].attachment_site
+        robot_cfg.kinematic_model_path = rcs.ROBOTS[rt].mjcf_model_path
+        # the servo friction stalls the joints up to frictionloss / kp = 2.9 mrad (0.17 deg) short of the target
+        robot_cfg.joint_rotational_tolerance = 0.2 * (np.pi / 180.0)
+        robot_cfg.arm_collision_geoms = []
+        robot_cfg.joints = [f"rev_motor_0{i}" for i in range(1, 8)]
+        robot_cfg.actuators = [f"rev_motor_0{i}" for i in range(1, 8)]
+        robot_cfg.dof = rcs.ROBOTS[rt].dof
+        robot_cfg.joint_limits = rcs.ROBOTS[rt].joint_limits
+        robot_cfg.q_home = rcs.ROBOTS[rt].q_home
+        robot_cfg.base = "base_link"
+
+        assert cfg.gripper_cfgs is not None
+        gripper_cfg = cfg.gripper_cfgs[lead_robot_name]
+        gripper_cfg.gripper_type = GripperType("ElRobot")
+        gripper_cfg.actuator = "rev_motor_08"
+        # the jaws follow rev_motor_08 through equality constraints, so only the servo joint is listed
+        gripper_cfg.joints = ["rev_motor_08"]
+        gripper_cfg.collision_geoms = []
+        gripper_cfg.collision_geoms_fingers = []
+        gripper_cfg.min_joint_width = 0.0
+        gripper_cfg.max_joint_width = 2.2028
+        gripper_cfg.min_actuator_width = 0.0
+        gripper_cfg.max_actuator_width = 2.2028
+
+        # the wrist camera is part of the elrobot mjcf, so it only needs the robot prefix
+        cfg.camera_cfgs = {
+            "wrist": SimCameraConfig(
+                identifier=self.robot_prefix_template.format(robot_name=lead_robot_name) + "wrist_camera",
+                type=CameraType.fixed,
+                # a native 16:9 mode of the U20CAM wrist camera, like the other RCS sim cameras
+                resolution_width=1280,
+                resolution_height=720,
+                frame_rate=30,
+            ),
+        }
+        cfg.camera_adds = None
+        cfg.gripper_offsets = None
+
+        return cfg
+
+
 gym.register(id="rcs/fr3", entry_point=EmptyWorldFR3())
 gym.register(id="rcs/duo", entry_point=EmptyWorldFR3Duo())
 gym.register(id="rcs/droid", entry_point=EmptyWorldDroid())
@@ -632,6 +686,7 @@ gym.register(id="rcs/ur5e", entry_point=EmptyWorldUR5e())
 gym.register(id="rcs/xarm7", entry_point=EmptyWorldXArm7())
 gym.register(id="rcs/so101", entry_point=EmptyWorldSO101())
 gym.register(id="rcs/yam", entry_point=EmptyWorldYam())
+gym.register(id="rcs/elrobot", entry_point=EmptyWorldElRobot())
 
 
 if __name__ == "__main__":
