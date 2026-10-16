@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rcs_elrobot"
+version = "0.7.3"
+description = "RCS ElRobot module"
+dependencies = [
+  "rcs-core>=0.7.3",
+  "st3215-bus>=0.1.1",
+]
+readme = "README.md"
+license = "AGPL-3.0-or-later"
+maintainers = [
+  { name = "Tobias Juelg", email = "tobias.juelg@utn.de" },
+]
+authors = [
+  { name = "Jan Nogga", email = "jan@nogga.eu" },
+]
+requires-python = ">=3.11"
+
+[project.optional-dependencies]
+# the wrist camera
+camera = ["rcs-usb-cam>=0.7.3"]
+
+[tool.black]
+line-length = 120
+target-version = ["py310"]
+
+[tool.isort]
+profile = "black"

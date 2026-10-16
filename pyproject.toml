@@ -229,6 +229,11 @@ version_files = [
   "extensions/rcs_yam/src/rcs_yam/__init__.py:__version__",
   "extensions/rcs_yam/pyproject.toml:\"rcs-core>=(.*)\"",
 
+  "extensions/rcs_elrobot/pyproject.toml:version",
+  "extensions/rcs_elrobot/src/rcs_elrobot/__init__.py:__version__",
+  "extensions/rcs_elrobot/pyproject.toml:\"rcs-core>=(.*)\"",
+  "extensions/rcs_elrobot/pyproject.toml:\"rcs-usb-cam>=(.*)\"",
+
   "extensions/rcs_tacto/pyproject.toml:version",
   "extensions/rcs_tacto/src/rcs_tacto/__init__.py:__version__",
   "extensions/rcs_tacto/pyproject.toml:\"rcs-core>=(.*)\"",

@@ -91,6 +91,7 @@ jobs:
           - rcs_robotiq2f85
           - rcs_tacto
           - rcs_usb_cam
+          - rcs_elrobot
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
