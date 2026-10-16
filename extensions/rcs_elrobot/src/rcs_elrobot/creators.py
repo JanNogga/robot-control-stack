@@ -1,10 +1,11 @@
+import dataclasses
 import logging
 import typing
 from dataclasses import dataclass, field
 
 import gymnasium as gym
 from rcs._core.common import BaseCameraConfig, GripperConfig
-from rcs.camera.hw import HardwareCamera, HardwareCameraSet
+from rcs.camera.hw import DummyCalibrationStrategy, HardwareCamera, HardwareCameraSet
 from rcs.envs.base import (
     CameraSetWrapper,
     ControlMode,
@@ -16,13 +17,16 @@ from rcs.envs.base import (
     RobotWrapper,
 )
 from rcs.envs.scenes import RCSEnvCreator, WrapperConfig
-from rcs_elrobot.camera import CameraCalibration
+from rcs_elrobot.camera import CameraCalibration, WristCameraCalibration
 from rcs_elrobot.hw import ElRobot, ElRobotConfig, ElRobotGripper
 
 import rcs
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+
+# Name of the wrist camera in the observations.
+WRIST = "wrist"
 
 
 @dataclass(kw_only=True)
@@ -81,6 +85,24 @@ def _create_hardware_camera_set(
     return HardwareCameraSet(cameras) if cameras else None
 
 
+def _with_wrist_extrinsics(
+    camera_cfgs: dict[str, HardwareCameraCreatorConfig] | None, robot: ElRobot
+) -> dict[str, HardwareCameraCreatorConfig] | None:
+    """Give a USB wrist camera extrinsics from the arm pose, unless a `calibration_strategy` is passed for it."""
+    if camera_cfgs is None:
+        return None
+    result: dict[str, HardwareCameraCreatorConfig] = {}
+    for key, cfg in camera_cfgs.items():
+        strategies = dict(cfg.kwargs.get("calibration_strategy") or {})
+        result[key] = cfg
+        if cfg.camera_type_id == "usb" and WRIST in cfg.camera_cfgs and WRIST not in strategies:
+            strategies[WRIST] = WristCameraCalibration(robot)
+            for name in cfg.camera_cfgs:
+                strategies.setdefault(name, DummyCalibrationStrategy())
+            result[key] = dataclasses.replace(cfg, kwargs=cfg.kwargs | {"calibration_strategy": strategies})
+    return result
+
+
 def _attach_camera_set(
     env: gym.Env, camera_cfgs: dict[str, HardwareCameraCreatorConfig] | None, include_depth: bool
 ) -> gym.Env:
@@ -89,6 +111,8 @@ def _attach_camera_set(
         return env
     camera_set.start()
     camera_set.wait_for_frames()
+    # sets the extrinsics, `CameraSetWrapper.reset` then waits for fresh frames that carry them
+    camera_set.calibrate()
     logger.info("CameraSet started")
     return CameraSetWrapper(env, camera_set, include_depth)
 
@@ -122,7 +146,7 @@ class RCSElRobotConfigEnvCreator(RCSEnvCreator[ElRobotHardwareEnvCreatorConfig])
             gripper = ElRobotGripper(cfg.gripper_cfg, robot)
             env = GripperWrapper(env, gripper, binary=cfg.wrapper_cfg.binary_gripper)
 
-        env = _attach_camera_set(env, cfg.camera_cfgs, cfg.wrapper_cfg.include_depth)
+        env = _attach_camera_set(env, _with_wrist_extrinsics(cfg.camera_cfgs, robot), cfg.wrapper_cfg.include_depth)
 
         if cfg.relative_to != RelativeTo.NONE:
             env = RelativeActionSpace(env, max_mov=cfg.max_relative_movement, relative_to=cfg.relative_to)

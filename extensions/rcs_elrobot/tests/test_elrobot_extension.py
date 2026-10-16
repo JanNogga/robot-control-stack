@@ -1,16 +1,30 @@
 import json
 import logging
 import sys
+import threading
+import time
 import typing
 from pathlib import Path
 
+import mujoco
 import numpy as np
 import pytest
+from rcs.camera.hw import DummyCalibrationStrategy
+from rcs.camera.interface import CameraFrame, DataFrame, Frame
 from rcs.envs.base import ControlMode
-from rcs_elrobot import hw
-from rcs_elrobot.camera import CameraCalibration
+from rcs.envs.configs import EmptyWorldElRobot
+from rcs_elrobot import creators, hw
+from rcs_elrobot.camera import (
+    CameraCalibration,
+    WristCameraCalibration,
+    camera_in_flange,
+)
 from rcs_elrobot.configs import DefaultElRobotHardwareEnv
-from rcs_elrobot.creators import HardwareCameraCreatorConfig, _create_usb_camera
+from rcs_elrobot.creators import (
+    HardwareCameraCreatorConfig,
+    _create_usb_camera,
+    _with_wrist_extrinsics,
+)
 from rcs_elrobot.hw import (
     ALL_MOTORS,
     ARM_MOTORS,
@@ -26,6 +40,8 @@ from rcs import common
 
 RANGES = {motor: (1000 + 10 * motor, 3000 + 10 * motor) for motor in ARM_MOTORS} | {GRIPPER_MOTOR: (1500, 2600)}
 LIMITS = rcs.ROBOTS[common.RobotType("ElRobot")].joint_limits
+# the fixture below patches time.sleep, the fake camera keeps its frame rate with the real one
+REAL_SLEEP = time.sleep
 
 
 class FakeBuses:
@@ -412,3 +428,179 @@ def test_env_lifecycle(tmp_path):
     env.close()
     assert bus().writes()[-2] == ("set_torque", False, list(ALL_MOTORS))
     assert bus().closed
+
+
+def calibrated(strategy: WristCameraCalibration) -> WristCameraCalibration:
+    assert strategy.calibrate([], np.zeros((3, 4)), threading.Lock())  # type: ignore[arg-type]
+    return strategy
+
+
+def test_wrist_extrinsics_from_last_reading(robot):
+    strategy = WristCameraCalibration(robot)
+    assert strategy.get_extrinsics() is None
+    calibrated(strategy)
+
+    reads = len(bus().calls)
+    extrinsics = strategy.get_extrinsics()
+    for _ in range(10):
+        strategy.get_extrinsics()
+    # the camera thread never touches the bus
+    assert len(bus().calls) == reads
+    assert extrinsics is not None
+    assert extrinsics.shape == (4, 4)
+    np.testing.assert_allclose(extrinsics[3], [0.0, 0.0, 0.0, 1.0])
+    np.testing.assert_allclose(extrinsics[:3, :3] @ extrinsics[:3, :3].T, np.eye(3), atol=1e-12)
+    assert np.linalg.det(extrinsics[:3, :3]) == pytest.approx(1.0)
+
+    # the camera is placed from the flange, a TCP offset does not move it
+    cfg = robot.get_config()
+    cfg.tcp_offset = common.Pose(translation=np.array([0.0, 0.0, 0.1]))  # type: ignore
+    robot.set_config(cfg)
+    np.testing.assert_array_equal(strategy.get_extrinsics(), extrinsics)
+
+    # it follows the arm once the env thread reads a new position
+    bus().positions[1] += 200
+    np.testing.assert_array_equal(strategy.get_extrinsics(), extrinsics)
+    robot.get_joint_position()
+    assert not np.allclose(strategy.get_extrinsics(), extrinsics)  # type: ignore[arg-type]
+
+
+def test_wrist_extrinsics_with_measured_mount(robot):
+    mount = common.Pose(rpy_vector=np.array([0.1, -0.2, 0.3]), translation=np.array([0.01, -0.05, -0.06]))  # type: ignore
+    strategy = calibrated(WristCameraCalibration(robot, camera_in_flange=mount))
+    flange = robot.ik.forward(robot.get_joint_position(), common.Pose())
+    expected = (flange * mount).inverse().pose_matrix()
+    np.testing.assert_allclose(strategy.get_extrinsics(), expected, atol=1e-12)  # type: ignore[arg-type]
+
+
+def test_last_joint_position_is_cached_and_locked(robot):
+    q = robot.get_joint_position()
+    reads = len(bus().calls)
+    bus().positions[2] += 300
+    np.testing.assert_array_equal(robot.get_last_joint_position(), q)
+    assert len(bus().calls) == reads
+    q_new = robot.get_joint_position()
+    assert q_new[1] != q[1]
+    np.testing.assert_array_equal(robot.get_last_joint_position(), q_new)
+
+    # the camera thread waits while the env thread updates the cache
+    result = []
+    with robot._read_lock:
+        reader = threading.Thread(target=lambda: result.append(robot.get_last_joint_position()))
+        reader.start()
+        reader.join(timeout=0.1)
+        assert reader.is_alive()
+    reader.join(timeout=5.0)
+    np.testing.assert_array_equal(result[0], q_new)
+
+
+def test_wrist_extrinsics_match_simulation(robot):
+    creator = EmptyWorldElRobot()
+    cfg = creator.config()
+    cfg.headless = True
+    lead = creator.lead_robot_name(cfg)
+    prefix = creator.robot_prefix_template.format(robot_name=lead)
+    joints = [prefix + joint for joint in cfg.robot_cfgs[lead].joints]
+    env = creator.create_env(cfg)
+    try:
+        sim = env.get_wrapper_attr("sim")
+        camera_set = env.get_wrapper_attr("camera_set")
+        model, data = sim.model, sim.data
+        qpos = [model.jnt_qposadr[model.joint(joint).id] for joint in joints]
+        mujoco.mj_forward(model, data)
+        # the simulated robot base is the world origin, like the base of the real arm
+        base = model.body(prefix + "base_link").id
+        np.testing.assert_allclose(data.xpos[base], 0.0, atol=1e-12)
+        np.testing.assert_allclose(data.xmat[base].reshape(3, 3), np.eye(3), atol=1e-12)
+
+        strategy = calibrated(WristCameraCalibration(robot))
+        calibration = ElRobotCalibration(RANGES, LIMITS)
+        rng = np.random.default_rng(0)
+        targets = [np.zeros(7), np.asarray(robot.get_config().q_home)] + [rng.uniform(*LIMITS) for _ in range(5)]
+        for target in targets:
+            bus().positions.update(calibration.arm_counts(target))
+            # the angles the arm reports, quantized to encoder counts
+            q = robot.get_joint_position()
+            data.qpos[qpos] = q
+            mujoco.mj_forward(model, data)
+            expected = camera_set._extrinsics("wrist")
+            np.testing.assert_allclose(strategy.get_extrinsics(), expected, atol=1e-6)  # type: ignore[arg-type]
+    finally:
+        env.close()
+
+
+def test_creator_adds_wrist_extrinsics_unless_given(robot):
+    cameras = {
+        name: common.BaseCameraConfig(identifier=name, resolution_width=1280, resolution_height=720, frame_rate=30)
+        for name in ("wrist", "other")
+    }
+    cfgs = {"usb": HardwareCameraCreatorConfig(camera_type_id="usb", camera_cfgs=cameras)}
+    strategies = _with_wrist_extrinsics(cfgs, robot)["usb"].kwargs["calibration_strategy"]  # type: ignore[index]
+    assert isinstance(strategies["wrist"], WristCameraCalibration)
+    assert isinstance(strategies["other"], DummyCalibrationStrategy)
+    # the user's config is not modified
+    assert cfgs["usb"].kwargs == {}
+
+    mine = DummyCalibrationStrategy()
+    cfgs["usb"].kwargs["calibration_strategy"] = {"wrist": mine, "other": mine}
+    assert _with_wrist_extrinsics(cfgs, robot)["usb"].kwargs["calibration_strategy"] == {  # type: ignore[index]
+        "wrist": mine,
+        "other": mine,
+    }
+    assert _with_wrist_extrinsics(None, robot) is None
+
+
+class FakeCamera:
+    """Stands in for `USBCameraSet`, uses its calibration strategies the same way."""
+
+    def __init__(self, cfg: HardwareCameraCreatorConfig):
+        self.cfg = cfg
+        self.strategies = cfg.kwargs.get("calibration_strategy") or {}
+
+    def open(self):
+        pass
+
+    def close(self):
+        pass
+
+    def config(self, camera_name: str) -> common.BaseCameraConfig:
+        return self.cfg.camera_cfgs[camera_name]
+
+    @property
+    def camera_names(self) -> list[str]:
+        return list(self.cfg.camera_cfgs)
+
+    def poll_frame(self, camera_name: str) -> Frame:
+        REAL_SLEEP(0.005)
+        color = DataFrame(
+            data=np.zeros((2, 2, 3), dtype=np.uint8), extrinsics=self.strategies[camera_name].get_extrinsics()
+        )
+        return Frame(camera=CameraFrame(color=color), avg_timestamp=time.time())
+
+    def calibrate(self) -> bool:
+        return all(strategy.calibrate([], np.zeros((3, 4)), threading.Lock()) for strategy in self.strategies.values())
+
+
+def test_env_observes_wrist_extrinsics(monkeypatch, tmp_path):
+    monkeypatch.setitem(creators.HARDWARE_CAMERA_CREATORS, "usb", FakeCamera)
+    write_calibration(tmp_path)
+    creator = DefaultElRobotHardwareEnv()
+    creator.port = "/dev/fake"
+    creator.calibration_dir = str(tmp_path)
+    creator.camera = "/dev/video-fake"
+    cfg = creator.config()
+    env = creator.create_env(cfg)
+    try:
+        obs, _ = env.reset()
+        # present from the first observation
+        assert obs["frames"]["wrist"]["rgb"]["extrinsics"].shape == (4, 4)
+
+        robot = env.get_wrapper_attr("robot")
+        mount = camera_in_flange(cfg.robot_cfg.kinematic_model_path, cfg.robot_cfg.attachment_site)
+        expected = (robot.ik.forward(robot.get_last_joint_position(), common.Pose()) * mount).inverse()
+        # the arm rests after the reset, wait for a frame taken there
+        REAL_SLEEP(0.1)
+        frames = env.get_wrapper_attr("camera_set").get_latest_frames()
+        np.testing.assert_allclose(frames.frames["wrist"].camera.color.extrinsics, expected.pose_matrix(), atol=1e-12)
+    finally:
+        env.close()

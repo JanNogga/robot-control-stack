@@ -123,6 +123,22 @@ A calibration carries over to a capture resolution of the same aspect ratio by s
 which holds for cameras that scale the full sensor image, like the 16:9 modes of the ElRobot's U20CAM. A
 resolution of another aspect ratio raises an error, calibrate at the resolution you capture with in that case.
 
+### Extrinsics
+
+The extrinsics of the wrist camera are filled in automatically, as the transform from world (the robot base) to
+camera, the same as in simulation. They are computed for every frame from the latest joint reading of the arm and
+the camera mount in the kinematic model, so no measurement is needed. To override them, pass your own
+`rcs.camera.hw.CalibrationStrategy` for the wrist camera:
+
+```python
+cfg = env_creator.config()
+cfg.camera_cfgs["wrist"].kwargs["calibration_strategy"] = {"wrist": my_strategy}
+env = env_creator.create_env(cfg)
+```
+
+Without the env wrappers, `rcs_elrobot.camera.WristCameraCalibration(robot, camera_in_flange=pose)` takes the
+pose of a measured mount relative to the robot's `attachment_site`.
+
 ## Safety notes
 
 - Creating the robot only reads from the servos. Torque is enabled by the first command, after the goal of

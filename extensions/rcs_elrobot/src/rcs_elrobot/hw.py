@@ -14,6 +14,7 @@ Lifecycle on hardware:
 """
 
 import logging
+import threading
 import time
 import typing
 from pathlib import Path
@@ -187,6 +188,8 @@ class ElRobot(common.Robot):
             Path(cfg.calibration_dir) / f"{cfg.id}.json", np.asarray(cfg.joint_limits)
         )
         self._counts: dict[int, int] = {}
+        # guards the read cache, which the wrist camera's polling thread reads through `get_last_joint_position`
+        self._read_lock = threading.Lock()
         self._missed = dict.fromkeys(ALL_MOTORS, 0)
         self._read_at = -np.inf
         self._engaged = False
@@ -230,6 +233,12 @@ class ElRobot(common.Robot):
 
     def get_joint_position(self) -> np.ndarray[tuple[typing.Any], np.dtype[np.float64]]:
         return self._calibration.arm_angles(self._read())
+
+    def get_last_joint_position(self) -> np.ndarray[tuple[typing.Any], np.dtype[np.float64]]:
+        """The joint positions of the most recent read, without reading the bus. Thread safe."""
+        with self._read_lock:
+            counts = dict(self._counts)
+        return self._calibration.arm_angles(counts)
 
     def get_gripper_width(self) -> float:
         """Normalized gripper width, 0 is closed and 1 is open."""
@@ -379,24 +388,26 @@ class ElRobot(common.Robot):
     def _read(self) -> dict[int, int]:
         """Present positions in counts. A motor that misses a read keeps its last value for a few reads."""
         self._assert_open()
-        if time.monotonic() - self._read_at < READ_MAX_AGE:
-            return self._counts
+        with self._read_lock:
+            if time.monotonic() - self._read_at < READ_MAX_AGE:
+                return dict(self._counts)
         got = self._bus.read_positions(list(ALL_MOTORS)).get(BUS, {})
-        for motor in ALL_MOTORS:
-            if motor in got:
-                self._counts[motor] = got[motor]
-                self._missed[motor] = 0
-            else:
-                self._missed[motor] += 1
-        silent = [motor for motor, missed in self._missed.items() if missed > self._config.max_missed_reads]
-        if silent:
-            msg = (
-                f"Motors {silent} on {self._config.port} did not answer {self._config.max_missed_reads} reads in a "
-                "row. Check their cables and the servo power supply."
-            )
-            raise RuntimeError(msg)
-        self._read_at = time.monotonic()
-        return self._counts
+        with self._read_lock:
+            for motor in ALL_MOTORS:
+                if motor in got:
+                    self._counts[motor] = got[motor]
+                    self._missed[motor] = 0
+                else:
+                    self._missed[motor] += 1
+            silent = [motor for motor, missed in self._missed.items() if missed > self._config.max_missed_reads]
+            if silent:
+                msg = (
+                    f"Motors {silent} on {self._config.port} did not answer {self._config.max_missed_reads} reads "
+                    "in a row. Check their cables and the servo power supply."
+                )
+                raise RuntimeError(msg)
+            self._read_at = time.monotonic()
+            return dict(self._counts)
 
     def _read_complete(self) -> dict[int, int]:
         """One read in which every motor answered."""
@@ -404,9 +415,10 @@ class ElRobot(common.Robot):
         for _ in range(READ_ATTEMPTS):
             got = self._bus.read_positions(list(ALL_MOTORS)).get(BUS, {})
             if all(motor in got for motor in ALL_MOTORS):
-                self._counts = dict(got)
-                self._missed = dict.fromkeys(ALL_MOTORS, 0)
-                self._read_at = time.monotonic()
+                with self._read_lock:
+                    self._counts = dict(got)
+                    self._missed = dict.fromkeys(ALL_MOTORS, 0)
+                    self._read_at = time.monotonic()
                 return dict(got)
         missing = [motor for motor in ALL_MOTORS if motor not in got]
         msg = (
