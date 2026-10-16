@@ -14,7 +14,8 @@
        - jaw coupling reversed so that rev_motor_08 = 0 is closed and 2.2028 is open
        - added the wrist camera: the BOM's arm camera (Innomaker U20CAM-1080P) on
          NormaCore's 27 mm gripper camera mount; the camera body is drawn as a box and a
-         cylinder, its intrinsics are nominal (centred principal point)
+         cylinder; the camera is an ideal pinhole with a 47.5 deg vertical field of view,
+         matching the U20CAM's measured field of view
        - added position actuators with ST3215 gains and the attachment_site at the TCP
 
      Joint names are NormaCore's, where NN in rev_motor_NN is the ST3215 servo id:
@@ -290,7 +291,7 @@
                     <geom class="collision" type="cylinder" size="0.0105962165 0.01315" pos="0.0230197117 -0.00147560932 0.0600289688" quat="0.376027037 0.605857219 0.588927363 0.380401443" />
                     <geom class="collision" mesh="sts3215_col" pos="0.0258909445 -0.00026745747 -0.0130491411" quat="0.499948298 0.508544241 0.491464962 0.499896634" />
                     <site name="attachment_site" pos="0.0971990297 -0.00168817024 0.00036011373" quat="-0.5 0.5 -0.5 0.5" size="0.005" group="3" />
-                    <camera name="wrist_camera" mode="fixed" pos="0.0341585903 -0.00156898629 0.0547568035" quat="-0.594941917 -0.376631377 0.379803103 0.599952102" resolution="1920 1080" sensorsize="0.001920 0.001080" focalpixel="1230.2570 1229.9495" principalpixel="0 0" />
+                    <camera name="wrist_camera" mode="fixed" pos="0.0341585903 -0.00156898629 0.0547568035" quat="-0.594941917 -0.376631377 0.379803103 0.599952102" fovy="47.5" />
                     <body name="gripper_gear_link" pos="0.045242 -0.000776 -0.000409">
                       <inertial pos="0.00389462097 -5.96030507e-05 -3.46368285e-05" mass="0.00219223396" fullinertia="1.94827881e-07 1.0318743e-07 1.03179832e-07 -1.23227549e-09 -8.3944434e-10 1.12656522e-11" />
                       <joint name="rev_motor_08" type="hinge" axis="1 2.22044605e-16 0" range="0 2.2028" class="sts3215" />
