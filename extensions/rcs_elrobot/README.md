@@ -139,6 +139,59 @@ env = env_creator.create_env(cfg)
 Without the env wrappers, `rcs_elrobot.camera.WristCameraCalibration(robot, camera_in_flange=pose)` takes the
 pose of a measured mount relative to the robot's `attachment_site`.
 
+## Leader arm teleoperation
+
+`ElRobotLeaderOperator` drives an ElRobot from an ElRobot leader arm, a second ElRobot with a handle and a
+trigger in place of the gripper. Motors 1 to 7 of the leader give the joint targets of the follower, motor 8, the
+trigger, gives its gripper width. The leader's servos are only read.
+
+Each leader has its own serial port and its own calibration, exported in the same way as the follower's, one file
+per bus, e.g. `--name <LEADER_SERIAL>=leader` for `calibration/leader.json`. Two settings of
+`ElRobotLeaderArmConfig` adapt the mapping:
+
+- `wrist_offset` (rad, default `0.0`) is added to the leader's joint 7, for a handle mounted at an angle to the
+  follower's gripper. The result is clipped to the joint limits.
+- `trigger_full_open` (default `1.0`) is how far the trigger has to travel for the follower's gripper to be fully
+  open, e.g. `0.55` opens it fully at 55% of the trigger travel.
+
+`TeleopLoop` addresses robots by name, so the arm's env is wrapped in a `MultiRobotWrapper`, with the same key as
+the leader in `arms`. The leader sends absolute joint targets, so the env runs with `RelativeTo.NONE`:
+
+```python
+from rcs.envs.base import CoverWrapper, MultiRobotWrapper, RelativeTo
+from rcs.operator.interface import TeleopLoop
+from rcs_elrobot.configs import DefaultElRobotHardwareEnv
+from rcs_elrobot.operator import ElRobotLeaderArmConfig, ElRobotLeaderConfig, ElRobotLeaderOperator
+
+env_creator = DefaultElRobotHardwareEnv()
+env_creator.port = "/dev/serial/by-id/usb-...follower..."
+env_creator.calibration_dir = "calibration"
+cfg = env_creator.config()
+cfg.relative_to = RelativeTo.NONE
+cfg.wrapper_cfg.binary_gripper = False
+env = CoverWrapper(MultiRobotWrapper({"right": env_creator.create_env(cfg)}))
+
+operator = ElRobotLeaderOperator(
+    ElRobotLeaderConfig(
+        arms={
+            "right": ElRobotLeaderArmConfig(
+                port="/dev/serial/by-id/usb-...leader...", id="leader", calibration_dir="calibration"
+            )
+        },
+        simulation=False,
+    )
+)
+tele = TeleopLoop(env, operator, env_frequency=30)
+with env, tele:
+    tele.environment_step_loop()
+```
+
+Keys, with `pynput` installed: `s` moves the follower to the leader and starts following, `r` marks a
+failure and resets the env, after which `s` syncs again.
+
+Several leaders work the same way, one entry in `arms` per robot. The simulated `rcs/elrobot` env is already a
+`MultiRobotWrapper` with the robot `right`.
+
 ## Safety notes
 
 - Creating the robot only reads from the servos. Torque is enabled by the first command, after the goal of
